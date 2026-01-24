@@ -1,0 +1,8 @@
+.idea
+.venv
+features/
+
+*.py[oc]
+__pycache__/
+
+test.py
