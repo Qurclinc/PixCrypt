@@ -16,6 +16,7 @@ class Crypter:
         self.CHUNK_SIZE = 4 * 1024 # 4KB
         
     def __init_iv(self, filepath: Path):
+        print(filepath, type(filepath))
         data_length = filepath.stat().st_size
         iv_len = data_length % secrets.randbits(8)
         step = ((data_length - 1) // iv_len) // 3
@@ -55,13 +56,16 @@ class Crypter:
             raise FileNotFoundError
         self.key = np.asarray(Image.open(image_path)).tobytes()
     
-    def encrypt(self, input_filepath: Path, output_filepath: Path) -> Tuple[bool, str]:
+    def encrypt(self, input_filepath: Path | str, output_filepath: Path | str) -> Tuple[bool, str]:
+        if isinstance(input_filepath, str): input_filepath = Path(input_filepath)
+        if isinstance(output_filepath, str): output_filepath = Path(output_filepath)
+        
         
         if not self.key:
             raise KeyError
         
         length, step, vector = self.__init_iv(input_filepath).values()
-        print(length, step, vector)
+        # print(length, step, vector)
         
         seed = sum(vector)
         random.seed(seed)
@@ -89,11 +93,13 @@ class Crypter:
         return (True, "Success")
     
     def decrypt(self, input_filepath: Path, output_filepath: Path) -> Tuple[bool, str]:
+        if isinstance(input_filepath, str): input_filepath = Path(input_filepath)
+        if isinstance(output_filepath, str): output_filepath = Path(output_filepath)
         with open(input_filepath, "rb") as f:
             line = f.readline()
         iv_length, step, _ = re.split(r"0x[0-9a-fA-F]{4}", str(line)[2:])
         iv_length, step = int(iv_length), int(step)
-        print(iv_length, step)
+        # print(iv_length, step)
         vector = self.__collect_vector(input_filepath, iv_length, step)
         seed = sum(vector)
         
@@ -115,3 +121,5 @@ class Crypter:
                     chunk_res.append(ch ^ int(shuffled_key[counter % len_key]))
                     counter += 1
                 fout.write(chunk_res)
+                
+        return (True, "Success")

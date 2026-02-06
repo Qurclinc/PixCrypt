@@ -38,6 +38,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(header)
 
         tabs = QTabWidget()
+        
         tabs.addTab(CryptoTab("encrypt"), "ENCRYPT")
         tabs.addTab(CryptoTab("decrypt"), "DECRYPT")
 

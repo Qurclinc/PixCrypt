@@ -1,5 +1,5 @@
 import os
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QFileDialog
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QFileDialog, QProgressBar
 from PyQt5.QtCore import Qt
 
 from UI.widgets.primary_button import PrimaryButton
@@ -7,7 +7,8 @@ from UI.widgets.app_label import AppLabel
 from UI.widgets.panel_frame import PanelFrame
 from UI.dialogs.success_dialog import SuccessDialog
 from UI.dialogs.error_dialog import ErrorDialog
-from Services.Crypter import Crypter
+from Services.crypter import Crypter
+from UI.worker import Worker
 
 
 class CryptoTab(QWidget):
@@ -18,7 +19,19 @@ class CryptoTab(QWidget):
         self.init_ui()
 
     def init_ui(self):
+        
+        self.loader = QProgressBar()
+        self.loader.setRange(0, 0)
+        self.loader.setVisible(False)
+        self.loader.setFormat("PROCESSING...")
+        self.loader.setTextVisible(True)
+
+        
         layout = QVBoxLayout(self)
+        
+        upper_frame = PanelFrame()
+        upper_layout = QVBoxLayout(upper_frame)
+        upper_frame.setObjectName("MainLayout")
 
         title = AppLabel(
             f"{self.mode.upper()} FILE",
@@ -26,7 +39,7 @@ class CryptoTab(QWidget):
             bold=True,
             align=Qt.AlignCenter
         )
-        layout.addWidget(title)
+        upper_layout.addWidget(title)
 
         # Source
         source_frame = PanelFrame()
@@ -43,7 +56,7 @@ class CryptoTab(QWidget):
         
         source_file_label.setObjectName("NoBorder")
         
-        layout.addWidget(source_frame)
+        upper_layout.addWidget(source_frame)
 
         # Key
         key_frame = PanelFrame()
@@ -61,17 +74,16 @@ class CryptoTab(QWidget):
 
         key_upper_label.setObjectName("NoBorder")
         
-        layout.addWidget(key_frame)
+        upper_layout.addWidget(key_frame)
     
+        layout.addWidget(upper_frame)
 
         self.action_btn = PrimaryButton(self.mode.upper())
         self.action_btn.setEnabled(False)
         self.action_btn.clicked.connect(self.perform_action)
         layout.addWidget(self.action_btn)
-
-        self.status_label = AppLabel("Ready...", align=Qt.AlignCenter)
-        layout.addWidget(self.status_label)
         
+        layout.addWidget(self.loader)
 
     def select_source_file(self):
         file_filter = "Encrypted Files (*.pixcrypted)" if self.mode == "decrypt" else "All Files (*)"
@@ -106,19 +118,46 @@ class CryptoTab(QWidget):
         caption = "Save Encrypted File" if self.mode == "encrypt" else "Save Decrypted File"
         filter_ = "Encrypted Files (*.pixcrypted)" if self.mode == "encrypt" else "All Files (*)"
 
-        output, _ = QFileDialog.getSaveFileName(self, caption, "", filter_)
+        output, _ = QFileDialog.getSaveFileName(
+            self,
+            caption,
+            "",
+            filter_
+        )
         if not output:
             return
 
-        ok, message = (
-            self.crypter.encrypt(self.source_file, output)
-            if self.mode == "encrypt"
-            else self.crypter.decrypt(self.source_file, output)
+        self.action_btn.setEnabled(False)
+
+        self.worker = Worker(
+            self.crypter,
+            self.mode,
+            self.source_file,
+            output
         )
 
+        self.worker.finished.connect(self.on_done)
+        self.worker.error.connect(self.on_error)
+        
+        self.action_btn.setEnabled(False)
+        self.loader.setVisible(True)
+        
+        self.worker.start()
+
+        
+        
+    def on_done(self, ok, message):
+        self.loader.setVisible(False)
+        self.action_btn.setEnabled(True)
+        
         if ok:
             SuccessDialog(message).exec()
-            self.status_label.setText("Operation completed successfully")
         else:
             ErrorDialog(message).exec()
-            self.status_label.setText("Operation failed")
+
+    def on_error(self, msg):
+        self.loader.setVisible(False)
+        self.action_btn.setEnabled(True)
+        
+        self.action_btn.setEnabled(True)
+        ErrorDialog(msg).exec()
